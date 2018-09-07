@@ -1,0 +1,128 @@
+import numpy as np
+from obspy.taup import TauPyModel
+import h5py
+from tqdm import tqdm
+import os
+
+def create_taup(file):
+    from obspy.taup.taup_create import build_taup_model
+    with h5py.File(file, 'r') as f:
+        mantle = f['mantle']
+        fnam_out = os.path.splitext(file)[0] + '.nd'
+        nlayer = len(mantle['vp'])
+        with open(fnam_out, 'w') as fid:
+            for i in np.arange(nlayer - 1, 0, -1):
+                if i == nlayer - 9:
+                    fid.write('mantle\n')
+                if i < 30:
+                    if (mantle['vs'][i] < 1e-1) and (mantle['vs'][i+1] > 1e-1):
+                        fid.write('outer-core\n')
+                fid.write('%7.2f %6.4f %6.4f %6.4f\n' %
+                          (1e-3 * (mantle['radius'][-1] - mantle['radius'][i]),
+                           1e-3 * mantle['vp'][i],
+                           1e-3 * mantle['vs'][i],
+                           1e-3 * mantle['rho'][i] ))
+            fid.write('%7.2f %6.4f %6.4f %6.4f\n' %
+                      (3389.3,
+                       1e-3 * mantle['vp'][0],
+                       1e-3 * mantle['vs'][0],
+                       1e-3 * mantle['rho'][0] ))
+            fid.write('inner-core\n')
+            fid.write('%7.2f %6.4f %6.4f %6.4f\n' %
+                      (3389.3,
+                       1e-3 * mantle['vp'][0],
+                       3.0,
+                       1e-3 * mantle['rho'][0] ))
+            fid.write('%7.2f %6.4f %6.4f %6.4f\n' %
+                      (3389.5,
+                       1e-3 * mantle['vp'][0],
+                       3.0,
+                       1e-3 * mantle['rho'][0] ))
+        model_name = os.path.splitext(os.path.split(fnam_out)[-1])[0]
+        taup_name = os.path.join('taup_files', model_name + '.npz')
+        if not os.path.exists(taup_name):
+            build_taup_model(fnam_out, output_folder='taup_files')
+
+
+def body_waves(hdf5_file, npz_file):
+
+    model = TauPyModel(npz_file)
+
+    depths = [0.00, 1.00, 2.00, 3.00, 4.00, 5.00, 10.00, 15.00, 20.00,
+              25.00, 30.00, 33.00, 35.00, 40.00, 45.00, 49.00, 51.00, 55.00, 60.00,
+              70.00, 80.00, 90.00, 100.00, 120.00, 140.00, 160.00, 180.00, 200.00, 220.00,
+              240.00, 260.00, 280.00, 300.00, 350.00, 400.00, 450.00, 500.00, 550.0, 600.00]
+
+    dists = [0.00, 0.10, 0.20, 0.30, 0.40, 0.50, 0.60, 0.70, 0.80, 0.90,
+             1.00, 1.10, 1.20, 1.30, 1.40, 1.50, 1.60, 1.70, 1.80, 1.90,
+             2.00, 2.10, 2.20, 2.30, 2.40, 2.50, 2.60, 2.70, 2.80, 2.90,
+             3.00, 3.10, 3.20, 3.30, 3.40, 3.50, 3.60, 3.70, 3.80, 3.90,
+             4.00, 4.10, 4.20, 4.30, 4.40, 4.50, 4.60, 4.70, 4.80, 4.90,
+             5.00, 5.10, 5.20, 5.30, 5.40, 5.50, 5.60, 5.70, 5.80, 5.90,
+             6.00, 6.10, 6.20, 6.30, 6.40, 6.50, 6.60, 6.70, 6.80, 6.90,
+             7.00, 7.10, 7.20, 7.30, 7.40, 7.50, 7.60, 7.70, 7.80, 7.90,
+             8.00, 8.10, 8.20, 8.30, 8.40, 8.50, 8.60, 8.70, 8.80, 8.90,
+             9.00, 9.10, 9.20, 9.30, 9.40, 9.50, 9.60, 9.70, 9.80, 9.90,
+             10.00, 11.00, 12.00, 13.00, 14.00, 15.00, 16.00, 17.00, 18.00, 19.00,
+             20.00, 21.00, 22.00, 23.00, 24.00, 25.00, 26.00, 27.00, 28.00, 29.00,
+             30.00, 31.00, 32.00, 33.00, 34.00, 35.00, 36.00, 37.00, 38.00, 39.00,
+             40.00, 41.00, 42.00, 43.00, 44.00, 45.00, 46.00, 47.00, 48.00, 49.00,
+             50.00, 51.00, 52.00, 53.00, 54.00, 55.00, 56.00, 57.00, 58.00, 59.00,
+             60.00, 61.00, 62.00, 63.00, 64.00, 65.00, 66.00, 67.00, 68.00, 69.00,
+             70.00, 71.00, 72.00, 73.00, 74.00, 75.00, 76.00, 77.00, 78.00, 79.00,
+             80.00, 81.00, 82.00, 83.00, 84.00, 85.00, 86.00, 87.00, 88.00, 89.00,
+             90.00, 91.00, 92.00, 93.00, 94.00, 95.00, 96.00, 97.00, 98.00, 99.00,
+             100.00, 105.00, 110.00, 115.00, 120.00, 125.00, 130.00, 135.00, 140.00, 145.00,
+             150.00, 155.00, 160.00, 165.00, 170.00, 175.00, 179.00]
+
+    phase_names = ['p', 's', 'pP', 'sP', 'pS', 'sS', 'P', 'S', 'PP', 'SS', 'PPP', 'SSS', 'Pn', 'Sn', 'Pg', 'Sg', 'PcP',
+                   'ScS', 'PKKP', 'SKKS', 'Pdiff', 'Sdiff', 'PKP', 'SKS']
+    '''
+    phase_names = ['p', 's', 'pP', 'sP', 'pS', 'sS', 'P', 'S', 'PP', 'SS', 'PPP', 'SSS', 'Pn', 'Sn', 'Pg', 'Sg', 'PcP',
+                   'ScS', 'PmP', 'SmS', 'SmP', 'PmS', 'P^mP', 'S^mS', 'S^mP', 'P^mS', 'PvmP', 'SvmS', 'SvmP', 'PvmS',
+                   'PKKP', 'SKKS', 'SKKP', 'PKKS', 'Pdiff', 'Sdiff', 'PKP', 'SKS', 'PKiKP', 'SKiKS', 'PKIKP', 'SKIKS']
+    '''
+
+    n_phase = {}
+    for counter, phase in enumerate(phase_names):
+        n_phase[phase] = counter
+
+    phase_names_P1 = ['p', 'Pg', 'Pn', 'P', 'PP', 'PKP']
+    phase_names_S1 = ['s', 'Sg', 'Sn', 'S', 'SS', 'SKS']
+
+    times = np.ones((len(depths), len(dists), len(phase_names)))*-1
+    inc_angles = np.ones((len(depths), len(dists), len(phase_names)))*-1
+    P1_times = np.ones((len(depths), len(dists)))*-1
+    S1_times = np.ones((len(depths), len(dists)))*-1
+    for x, depth_i in enumerate(tqdm(depths)):
+        for y, dist_i in enumerate(dists):
+            try:
+                arrs = model.get_travel_times(source_depth_in_km=depth_i, distance_in_degree=dist_i,
+                                              phase_list=phase_names)
+            except RuntimeError:
+                print('Error at depth %5.1f, distance %5.1f' % (depth_i, dist_i))
+            else:
+                for arr in np.flip(arrs, 0):
+                    times[x, y, n_phase[arr.phase.name]] = arr.time
+                    inc_angles[x, y, n_phase[arr.phase.name]] = arr.incident_angle
+                    if arr.phase.name in phase_names_P1:
+                        P1_times[x, y] = arr.time
+                    if arr.phase.name in phase_names_S1:
+                        S1_times[x, y] = arr.time
+
+    with h5py.File(hdf5_file, 'r+') as f:
+        grp_body_waves = f.create_group('body_waves')
+        grp_body_waves.create_dataset('distances', data=dists)
+        grp_body_waves.create_dataset('depths', data=depths)
+        grp_body_waves.create_dataset('phase_names', data=[n.encode("ascii", "ignore") for n in phase_names])
+        grp_body_waves.create_dataset('times', data=times, dtype='f2')
+        grp_body_waves.create_dataset('inc_angles', data=inc_angles, dtype='f2')
+        grp_body_waves.create_dataset('P1_times', data=P1_times, dtype='f2')
+        grp_body_waves.create_dataset('S1_times', data=S1_times, dtype='f2')
+
+    f.close()
+
+
+# test
+create_taup('mantlecrust_016000.h5')
+body_waves('mantlecrustbody_test.h5', 'taup_files/mantlecrust_016000.npz')

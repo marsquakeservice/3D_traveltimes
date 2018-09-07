@@ -5,16 +5,38 @@ A surface wave ray tracing class.
 
 :copyright:
     Martin van Driel (Martin@vanDriel.de), 2016
+    Simon Stähler (simonsta@ethz.ch), 2018
 :license:
     None
 '''
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy import integrate
-from scipy.optimize import brentq, brenth
 import shtns
 import math
 import warnings
+from h5py import File
+
+
+def shoot(latitude_1_degree, longitude_1_degree, bearing_degree, distance, radius):
+    """
+    Shoot a ray from point in direction for certain length and return where you land
+    (Direct geodetic problem). Works on sphere
+    :param latitude_1_degree: latitude of starting point
+    :param longitude_1_degree: longitude of starting point
+    :param bearing_degree: bearing from north, CW
+    :param distance: distance in kilometer
+    :param radius: radius of planet
+    :return: latitude, longitude of target
+    """
+    lat1 = np.deg2rad(latitude_1_degree)
+    lon1 = np.deg2rad(longitude_1_degree)
+    bearing = np.deg2rad(bearing_degree)
+    lat2 = np.arcsin(np.sin(lat1) * np.cos(distance / radius) +
+                     np.cos(lat1) * np.sin(distance / radius) * np.cos(bearing))
+    lon2 = lon1 + np.arctan2(np.sin(bearing) * np.sin(distance / radius) * np.cos(lat1),
+                             np.cos(distance / radius) - np.sin(lat1) * np.sin(lat2))
+    return np.rad2deg(lat2), np.mod(np.rad2deg(lon2) + 540., 360.) - 180.
 
 
 def weighted_avg_and_std(values, weights):
@@ -28,7 +50,7 @@ def weighted_avg_and_std(values, weights):
     return (average, math.sqrt(variance))
 
 
-class surface_wave_ray_tracer(object):
+class SurfaceWaveRayTracer(object):
     def __init__(self, R, lmax, nphi=None, ntheta=None, delta_phi=1.):
         self.R = R
         self.lmax = lmax
@@ -54,6 +76,17 @@ class surface_wave_ray_tracer(object):
         self.delta_phi = np.deg2rad(delta_phi)
 
         self.group_velocity = None
+        self.phase_velocity = None
+        self.topo = None
+        self.group_velocity_ylm = None
+        self.phase_velocity_ylm = None
+        self.topo_ylm = None
+        self.group_velocity_notrot = None
+        self.phase_velocity_notrot = None
+        self.topo_notrot = None
+        self.group_velocity_ylm_notrot = None
+        self.phase_velocity_ylm_notrot = None
+        self.topo_ylm_notrot = None
 
     def set_constant_velocity(self, c, which='phase'):
         shape = (self.nphi, self.ntheta)
@@ -99,50 +132,53 @@ class surface_wave_ray_tracer(object):
             self.group_velocity = self.sh.synth(ylm).copy()
             self.group_velocity_notrot = self.group_velocity.copy()
 
+        elif which == 'topo':
+            self.topo_ylm = ylm.copy()
+            self.topo_ylm_notrot = ylm.copy()
+            self.topo = self.sh.synth(ylm).copy()
+            self.topo_notrot = self.group_velocity.copy()
+
         else:
             raise ValueError()
 
-    def _generate_rotation_test_model(self, src_longitude, src_latitude,
-                                       rec_longitude, rec_latitude):
-        # transform to radians
-        lat1 = math.radians(src_latitude)
-        long1 = math.radians(src_longitude)
-        lat2 = math.radians(rec_latitude)
-        long2 = math.radians(rec_longitude)
+    def load_velocity_model_h5(self, fname, type, iperiod):
+        with File(fname, 'r') as f:
+            ylm = np.zeros(self.sh.nlm) * 0j
+            ls = np.asarray(f['ylm_maps/l'], dtype=np.uint)
+            ms = np.asarray(f['ylm_maps/m'], dtype=np.uint)
 
-        shape = (self.nphi, self.ntheta)
-        self.phase_velocity = np.zeros(shape) + 1e3
+            var_path = 'ylm_maps/tt_%s_phase_%02d' % (type, iperiod)
+            ylm_raw = np.asarray(f[var_path])
+            for l, m, y in zip(ls, ms, ylm_raw):
+                if l > self.lmax:
+                    continue
+                ylm[self.sh.idx(np.int(l), np.int(m))] = y
+            self.phase_velocity_ylm = ylm.copy()
+            self.phase_velocity_ylm_notrot = ylm.copy()
+            self.phase_velocity = self.sh.synth(ylm).copy()
+            self.phase_velocity_notrot = self.phase_velocity.copy()
 
-        idtheta = (np.abs(self.phi - long1)).argmin()
-        idphi = (np.abs(self.theta - (math.pi / 2. - lat1))).argmin()
-        self.phase_velocity[idtheta, idphi] = 1e3 + 1. / math.cos(lat1)
+            var_path = 'ylm_maps/tt_%s_group_%02d' % (type, iperiod)
+            ylm_raw = np.asarray(f[var_path])
+            for l, m, y in zip(ls, ms, ylm_raw):
+                if l > self.lmax:
+                    continue
+                ylm[self.sh.idx(np.int(l), np.int(m))] = y
+            self.group_velocity_ylm = ylm.copy()
+            self.group_velocity_ylm_notrot = ylm.copy()
+            self.group_velocity = self.sh.synth(ylm).copy()
+            self.group_velocity_notrot = self.group_velocity.copy()
 
-        idtheta = (np.abs(self.phi - long2)).argmin()
-        idphi = (np.abs(self.theta - (math.pi / 2. - lat2))).argmin()
-        self.phase_velocity[idtheta, idphi] = 1e3 - 1. / math.cos(lat2)
-
-        ylm = self.sh.analys(self.phase_velocity.copy())
-        self.phase_velocity_ylm_notrot = ylm
-        self.phase_velocity_notrot = self.sh.synth(ylm.copy())
-
-    def _generate_focussing_test_model(self, longitude, latitude, c0=1e3,
-                                       delta_c=1e2, w=0.3):
-        # transform to radians
-        lat1 = math.radians(latitude)
-        long1 = math.radians(longitude)
-
-        shape = (self.nphi, self.ntheta)
-        theta, phi = np.meshgrid(self.theta, self.phi, indexing='ij')
-        self.phase_velocity = c0 + \
-            delta_c * np.exp(-((theta.T - (math.pi / 2. - lat1)) / w) ** 2) * \
-            np.exp(-((phi.T - long1) / w) ** 2)
-
-        ylm = self.sh.analys(self.phase_velocity.copy())
-
-        self.phase_velocity_ylm_notrot = ylm.copy()
-        self.phase_velocity_notrot = self.sh.synth(ylm.copy())
-        self.phase_velocity_ylm = ylm.copy()
-        self.phase_velocity = self.sh.synth(ylm.copy())
+            var_path = 'ylm_maps/surface_radius'
+            ylm_raw = np.asarray(f[var_path])
+            for l, m, y in zip(ls, ms, ylm_raw):
+                if l > self.lmax:
+                    continue
+                ylm[self.sh.idx(np.int(l), np.int(m))] = y
+            self.topo_ylm = ylm.copy()
+            self.topo_ylm_notrot = ylm.copy()
+            self.topo = self.sh.synth(ylm).copy()
+            self.topo_notrot = self.group_velocity.copy()
 
     def compute_mean_velocities(self):
 
@@ -191,6 +227,19 @@ class surface_wave_ray_tracer(object):
             return shtns.sht.SH_to_point(
                 self.sh, self.phase_velocity_ylm, np.cos(theta), phi)
 
+    def apply_topography_correction(self):
+        # waves are faster where the radius is smaller:
+        self.phase_velocity_notrot *= self.R / self.topo
+
+        # update spherical harmonic model as well
+        self.phase_velocity_ylm_notrot = \
+            self.sh.analys(self.phase_velocity_notrot.copy())
+
+        if self.group_velocity is not None:
+            self.group_velocity_notrot *= self.R / self.topo
+            self.group_velocity_ylm_notrot = \
+                self.sh.analys(self.group_velocity_notrot.copy())
+
     def apply_ellipticity_correction(self, flattening=0.00589):
         f = flattening
         b = (1. - f) ** (2. / 3.) * self.R
@@ -205,12 +254,12 @@ class surface_wave_ray_tracer(object):
         self.phase_velocity_notrot *= self.R / r_theta
 
         # update spherical harmonic model as well
-        self.phase_velocity_notrot_ylm = \
+        self.phase_velocity_ylm_notrot = \
             self.sh.analys(self.phase_velocity_notrot.copy())
 
         if self.group_velocity is not None:
             self.group_velocity_notrot *= self.R / r_theta
-            self.group_velocity_notrot_ylm = \
+            self.group_velocity_ylm_notrot = \
                 self.sh.analys(self.group_velocity_notrot.copy())
 
     def set_source_receiver(self, src_longitude, src_latitude, rec_longitude,
@@ -301,191 +350,6 @@ class surface_wave_ray_tracer(object):
 
             self.group_velocity = self.sh.synth(ylm.copy())
 
-    def __ray_tracing_kernel_kinematic(self, phi, y):
-        """
-        Kinematic ray-tracing equations (16.185 and 16.186) from Dahlen and
-        Tromp 1998:
-        dtheta/dphi = sin(theta) * cot(zeta)
-        dzeta/dphi  = - cos(theta) + sin(theta) * dln(c)/dtheta
-                      - cot(zeta) * dln(c)/dphi
-        where c = w/k is the phase velocity
-        """
-        # assign some variables for convenience of notation
-        theta = y[0]
-        zeta = y[1]
-
-        # cacluate the gradient
-        dc_dtheta, dc_dphi = self.get_grad_phase_velocity(theta, phi)
-        c = self.get_phase_velocity(theta, phi)
-        cg = self.get_group_velocity(theta, phi)
-
-        # kinematic ray-tracing
-        dtheta_dphi = math.sin(theta) * math.cos(zeta) / math.sin(zeta)
-        dzeta_dphi = -math.cos(theta) + math.sin(theta) * dc_dtheta / c - \
-            math.cos(zeta) / math.sin(zeta) * dc_dphi / c
-        dtg_dphi = math.sin(theta) / (math.sin(zeta) * cg)
-
-        return [dtheta_dphi, dzeta_dphi, dtg_dphi]
-
-    def __ray_tracing_kernel_kinematic_t(self, t, y):
-        """
-        Kinematic ray-tracing equations (16.182 and 16.184) from Dahlen and
-        Tromp 1998, with the generarting parameter sigma replaces by
-        t = sigma * omega * R / c ** 2 and k replaced by c = oemga / k
-        """
-        # assign some variables for convenience of notation
-        theta = y[0]
-        phi = y[1]
-        zeta = y[2]
-
-        # cacluate the gradient
-        dc_dtheta, dc_dphi = self.get_grad_phase_velocity(theta, phi)
-        c = self.get_phase_velocity(theta, phi)
-
-        # kinematic ray-tracing
-        dtheta_dt = c / self.R * math.cos(zeta)
-        dphi_dt = c / self.R * math.sin(zeta) / math.sin(theta)
-        dzeta_dt = math.sin(zeta) * dc_dtheta / self.R - \
-                math.cos(zeta) / math.sin(theta)* dc_dphi / self.R - \
-                math.cos(theta) / math.sin(theta) * math.sin(zeta) * c / self.R
-
-        return [dtheta_dt, dphi_dt, dzeta_dt]
-
-    def shoot_ray_t(self, shootingangle, tmax, rtol=1e-12, nsteps=10000,
-                    dt=1.):
-        """
-        integrates the ray-tracing equations from the source to  a given
-        shooting angle for time tmax
-        """
-        r = integrate.ode(self.__ray_tracing_kernel_kinematic_t)
-        r.set_integrator('dopri5', nsteps=nsteps, rtol=rtol)
-
-        n_steps = int(math.ceil(tmax / dt))
-
-        t = np.linspace(0., tmax, n_steps + 1)
-
-        # create vectors to store the ray
-        theta = np.zeros(n_steps + 1)
-        phi = np.zeros(n_steps + 1)
-        zeta = np.zeros(n_steps + 1)
-
-        # set the initial conditions
-        theta[0] = np.pi / 2
-        zeta[0] = shootingangle
-
-        # initialize integrator
-        r.set_initial_value([theta[0], phi[0], zeta[0]], 0.)
-
-        # integrate the ODEs across each phi_steps step
-        for i in np.arange(n_steps):
-            r.integrate(t[i + 1])
-
-            if not r.successful():
-                raise RuntimeError('Integration Error')
-
-            theta[i + 1], phi[i + 1], zeta[i + 1] = r.y
-
-        return t, theta, phi, zeta
-
-    def shoot_ray(self, shootingangle, orbit=1, return_path=False, rtol=1e-12,
-                  nsteps=10000):
-        """
-        integrates the ray-tracing equations from source to receiver longitude
-        for a given shooting angle
-        """
-        if orbit % 2 == 1:
-            dist = self.great_circle_distance + np.pi * (orbit - 1)
-        else:
-            dist = np.pi * orbit - self.great_circle_distance
-
-        # 'dopri5': explicit runge-kutta method of order (4)5 due to Dormand &
-        # Prince
-        r = integrate.ode(self.__ray_tracing_kernel_kinematic)
-        r.set_integrator('dopri5', nsteps=nsteps, rtol=rtol)
-
-        if return_path:
-            n_steps = int(math.ceil(dist / self.delta_phi))
-        else:
-            n_steps = 1
-
-        if orbit % 2 == 1:
-            phi = np.linspace(0., dist, n_steps + 1)
-        else:
-            phi = np.linspace(0., -dist, n_steps + 1)
-
-        # create vectors to store the ray
-        theta = np.zeros(n_steps + 1)
-        zeta = np.zeros(n_steps + 1)
-
-        # set the initial conditions
-        theta[0] = np.pi / 2
-        zeta[0] = shootingangle
-
-        # initialize integrator
-        r.set_initial_value([theta[0], zeta[0], 0], 0.)
-
-        # integrate the ODEs across each phi_steps step
-        for i in np.arange(n_steps):
-            r.integrate(phi[i + 1])
-
-            if not r.successful():
-                raise RuntimeError('Integration Error')
-
-            theta[i + 1] = r.y[0]
-            zeta[i + 1] = r.y[1]
-
-        group_arrival = np.abs(r.y[2]) * self.R
-
-        if return_path:
-            return np.pi / 2. - theta[-1], theta, phi, group_arrival
-        else:
-            return np.pi / 2 - theta[-1]
-
-    def find_rays(self, orbit=1, max_azimuth=45., nshots=50, rtol1=1e-5,
-                  rtol2=1e-12, verbose=False):
-        """
-        shoots rays for nshots take of angles with azimuths from 90 -
-        max_azimuth to 90 + max_azimuth degrees to the receiver longitude. If
-        for two consecutive shots the arrival latitude changes, uses Brent's
-        method to find the ray.
-        """
-
-        max_azimuth_rad = np.deg2rad(max_azimuth)
-        min_shootingangle = np.pi / 2 - max_azimuth_rad
-        max_shootingangle = np.pi / 2 + max_azimuth_rad
-
-        if orbit % 2 == 0:
-            min_shootingangle += np.pi
-            max_shootingangle += np.pi
-
-        shootingangles = np.linspace(min_shootingangle, max_shootingangle,
-                                     nshots)
-
-        rays = []
-        try:
-            theta1 = self.shoot_ray(shootingangles[0], orbit=orbit, rtol=rtol1)
-        except:
-            theta1 = 0.
-
-        for i in np.arange(nshots-1):
-            try:
-                theta2 = self.shoot_ray(shootingangles[i+1], orbit=orbit,
-                                        rtol=rtol1)
-            except:
-                theta2 = 0.
-
-            if theta1 * theta2 < 0:
-                rtmp, info = brentq(
-                    self.shoot_ray, shootingangles[i], shootingangles[i+1],
-                    args=(orbit, False, rtol2), full_output=True, disp=True)
-                if verbose:
-                    print(info)
-                rays.append(rtmp)
-
-            theta1 = theta2
-
-        return rays
-
     def compute_travel_time_great_circle(self, orbit=1, epsrel=1e-5,
                                          which='group'):
 
@@ -521,6 +385,22 @@ class surface_wave_ray_tracer(object):
         else:
             raise ValueError()
 
+    def calc_tt_map(self, nstep_dist, nstep_baz):
+        rec_longitude, rec_latitude = 136., 5.
+        dists = np.linspace(0.01, 0.99, nstep_dist) * np.pi * self.R
+        bazs = np.linspace(-360 / (nstep_baz),
+                           360 * (nstep_baz + 1) / (nstep_baz),
+                           nstep_baz, endpoint=True)
+        tt = np.zeros((len(dists), len(bazs)))
+        for idist, dist in enumerate(dists):
+            for ibaz, baz in enumerate(bazs):
+                src_latitude, src_longitude = shoot(rec_latitude, rec_longitude,
+                                                    bearing_degree=baz,
+                                                    distance=dist, radius=self.R)
+                self.set_source_receiver(src_longitude, src_latitude,
+                                         rec_longitude, rec_latitude)
+                tt[idist, ibaz] = self.compute_travel_time_great_circle(1, which='group')
+        return bazs, dists, tt
 
     def plot_velocity(self, show=True, rotated=True, source=True,
                       receiver=True, ms=10, cmap="RdGy", orbits=(0, 2),
@@ -534,11 +414,15 @@ class surface_wave_ray_tracer(object):
                 model = self.phase_velocity.T
             elif which == 'group':
                 model = self.group_velocity.T
+            else:
+                raise ValueError('Unknown velocity %s' % which)
         else:
             if which == 'phase':
                 model = self.phase_velocity_notrot.T
             elif which == 'group':
                 model = self.group_velocity_notrot.T
+            else:
+                raise ValueError('Unknown velocity %s' % which)
 
         label = '%s velocity / (m / s)' % which
 
@@ -579,8 +463,6 @@ class surface_wave_ray_tracer(object):
             warnings.warn("Source and receiver not initialized, skipping " +
                           "while plotting.")
 
-        # ax.set_xticks([0., 90., 180., 270., 360.])
-        #ax.set_xticks(np.linspace(0., 720, 9))
         ax.set_xticks(np.linspace(360. * orbits[0], 360. * orbits[1],
                                   (orbits[1] - orbits[0]) * 4 + 1))
         ax.set_yticks([-90., -45., 0., 45, 90.])
@@ -588,10 +470,6 @@ class surface_wave_ray_tracer(object):
         plt.ylabel('latitude')
 
         plt.xlim(360. * orbits[0], 360. * orbits[1])
-
-        # plt.xlim(0., 360.)
-        # plt.xlim(0., 720.)
-        # plt.xlim(0., 360. + np.rad2deg(self.great_circle_distance))
         plt.ylim(-90., 90.)
 
         plt.colorbar(label=label, orientation='horizontal')
@@ -600,47 +478,3 @@ class surface_wave_ray_tracer(object):
             plt.show()
         else:
             return fig
-
-
-if __name__ == "__main__":
-
-    R_mars = 3390e3
-
-    swrt = surface_wave_ray_tracer(R_mars, 32, nphi=360, ntheta=180,
-                                   delta_phi=0.01)
-
-    orbit = 4
-    #src_longitude, src_latitude = 0., -10.
-    #rec_longitude, rec_latitude = 136., 0.
-    #src_longitude, src_latitude = 0., 0.
-    #rec_longitude, rec_latitude = 180., 0.
-
-    # amp decrease
-    src_longitude, src_latitude = 0., -15.
-    rec_longitude, rec_latitude = 136., 5.
-
-    swrt.load_velocity_model_ylm(
-        'test_010s_phase.ylm')
-    # swrt.apply_ellipticity_correction()
-
-
-    swrt.set_source_receiver(src_longitude, src_latitude,
-                             rec_longitude, rec_latitude)
-    #swrt.plot_phase_velocity()
-
-    rtol1 = 1e-7
-    rtol2 = 1e-7
-    rays = swrt.find_rays(orbit=orbit, max_azimuth=60., nshots=100, rtol1=rtol1,
-                          rtol2=rtol2, verbose=True)
-
-
-    #swrt.plot_phase_velocity(show=False, rotated=False)
-    swrt.plot_velocity(show=False)
-
-    plt.show()
-
-    swrt.plot_velocity(show=False)
-    plt.xlim(0., 180.)
-    plt.ylim(-45., 45.)
-
-    plt.show()
