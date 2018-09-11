@@ -120,9 +120,8 @@ def body_waves(hdf5_file, npz_file):
         grp_body_waves.create_dataset('P1_times', data=P1_times, dtype='f2')
         grp_body_waves.create_dataset('S1_times', data=S1_times, dtype='f2')
 
-    f.close()
 
-
-# test
-create_taup('mantlecrust_016000.h5')
-body_waves('mantlecrustbody_test.h5', 'taup_files/mantlecrust_016000.npz')
+if __name__ == '__main__':
+    # test
+    create_taup('mantlecrust_016000.h5')
+    body_waves('mantlecrustbody_test.h5', 'taup_files/mantlecrust_016000.npz')
