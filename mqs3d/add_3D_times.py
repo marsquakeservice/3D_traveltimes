@@ -132,7 +132,7 @@ def write_tt_to_file(fname, periods, bazs, dists, tts):
         grp.create_dataset('backazimuths', data=bazs, dtype='f2')
         grp.create_dataset('distances', data=dists, dtype='f2')
         grp.create_dataset('periods', data=periods, dtype='f2')
-        for iperiod, period in enumerate(periods, dtype='f2'):
+        for iperiod, period in enumerate(periods):
             grp_period = grp.create_group('period_%02d' % iperiod)
             grp_period.create_dataset('p_c', data=period)
             grp_period.create_dataset('f_c', data=1./period)
@@ -144,6 +144,7 @@ def write_tt_to_file(fname, periods, bazs, dists, tts):
 
 
 def add_3D_traveltimes(model_file):
+    model_name = os.path.splitext(os.path.split(model_file)[-1])[0]
     work_dir = os.path.join('models_out')
     calc_disp_map(model_file, periods, work_dir)
 
