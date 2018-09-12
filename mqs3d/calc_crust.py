@@ -252,6 +252,7 @@ def calc_crust(mantlefile,    # filename for mantle profile input
                        vmax=120.)
 
     with h5py.File(fnam_out_model, 'w') as f:
+        f.create_dataset('model_name', data=mantlefile)
         print('Writing to %s' % fnam_out_model)
         grp_crust = f.create_group('crust')
         grp_crust.create_dataset('moho', data=moho_grid.data)
@@ -306,5 +307,5 @@ if __name__ == "__main__":
     files.sort()
     for file in files:
         calc_crust_mult(file)
-    #with Pool(1) as p:
-    #    p.map(calc_crust_mult, files)
+    with Pool(1) as p:
+        p.map(calc_crust_mult, files)

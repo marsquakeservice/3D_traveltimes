@@ -21,14 +21,15 @@ for mantle_file in files:
     h5_file = 'mantlecrust_016000.h5'
 
     # Calculate the crust map
-    calc_crust(mantlefile=mantle_file, fnam_out_model=h5_file, fnam_out_plot='test')
+    calc_crust(mantlefile=mantle_file,
+               fnam_out_model=h5_file, fnam_out_plot='test')
 
-# Do 3D surface wave travel times first
-add_3D_traveltimes(model_file=h5_file)
+    # Do 3D surface wave travel times first
+    add_3D_traveltimes(model_file=h5_file)
 
-# Add 1D body wave travel times now
-# First create TauPy-File
-taup_file = create_taup(model_file=h5_file)
+    # Add 1D body wave travel times now
+    # First create TauPy-File
+    taup_file = create_taup(model_file=h5_file)
 
-# Now fill H5 file with travel times
-add_bodywave_times(hdf5_file=h5_file, npz_file=taup_file)
+    # Now fill H5 file with travel times
+    add_bodywave_times(hdf5_file=h5_file, npz_file=taup_file)
