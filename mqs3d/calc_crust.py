@@ -264,6 +264,7 @@ def calc_crust(mantlefile,    # filename for mantle profile input
         rho[n] = rho[n-1]
 
         grp_mantle = f.create_group('mantle')
+        grp_mantle.create_dataset('moho_layer', data=crust_index)
         grp_mantle.create_dataset('radius', data=radius)
         grp_mantle.create_dataset('rho', data=rho)
         grp_mantle.create_dataset('vp', data=vp)
