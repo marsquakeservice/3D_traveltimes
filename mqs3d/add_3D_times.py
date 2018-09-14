@@ -1,3 +1,5 @@
+import matplotlib
+matplotlib.use('Agg')
 from mqs3d.crustal_thickness_to_phase_velocity import CrustalThicknessToVelocity, \
     filter_model_shtns, read_crustal_thickness_h5, write_model_h5
 
@@ -7,6 +9,7 @@ import numpy as np
 from scipy.interpolate import interp2d
 import os
 from h5py import File
+from obspy.geodetics import kilometer2degrees
 
 periods = [  5.00000,
              5.94604,
@@ -127,10 +130,11 @@ def plot_dispersion(ctvelo, plot_dir, thickness, periods, type):
 
 def write_tt_to_file(fname, periods, bazs, dists, tts):
     with File(fname, 'r+') as f:
-        print('Writing to %s' % fname)
+        # print('Writing to %s' % fname)
         grp = f.create_group('surface_waves')
         grp.create_dataset('backazimuths', data=bazs, dtype='f2')
-        grp.create_dataset('distances', data=dists, dtype='f2')
+        dists_deg = kilometer2degrees(dists, radius=3389.5e3)
+        grp.create_dataset('distances', data=dists_deg, dtype='f4')
         grp.create_dataset('periods', data=periods, dtype='f2')
         for iperiod, period in enumerate(periods):
             grp_period = grp.create_group('period_%02d' % iperiod)

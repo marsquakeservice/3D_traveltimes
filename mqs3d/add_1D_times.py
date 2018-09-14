@@ -128,7 +128,8 @@ def add_bodywave_times(hdf5_file, npz_file):
                                               distance_in_degree=dist_i,
                                               phase_list=phase_names[:-2])
             except RuntimeError:
-                print('Error at depth %5.1f, distance %5.1f' % (depth_i, dist_i))
+                # print('Error at depth %5.1f, distance %5.1f' % (depth_i, dist_i))
+                pass
             else:
                 for arr in np.flip(arrs, 0):
                     times[x, y, n_phase[arr.phase.name]] = arr.time

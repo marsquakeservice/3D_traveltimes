@@ -23,9 +23,9 @@ import h5py
 
 def calc_crust(mantlefile,    # filename for mantle profile input
                fnam_out_model,      # Output file name for thickness map
-               gravfile=pyCrust.gravfile,
-               topofile=pyCrust.topofile,
-               densityfile=pyCrust.densityfile,
+               gravfile='Data/gmm3_120_sha.tab',  #pyCrust.gravfile,     <--- changed 13.09.18
+               topofile='Data/MarsTopo719.shape',  #pyCrust.topofile,
+               densityfile='Data/dichotomy_359.sh',  #pyCrust.densityfile,
                fnam_out_plot=None,      # Output file name for plot of map
                t0=1.e3,       # minimum crustal thickness
                d_lith=300.e3  # Lithosphere thickness
@@ -42,21 +42,21 @@ def calc_crust(mantlefile,    # filename for mantle profile input
     potential.gm = float(header[1]) * 1.e9
     potential.mass = potential.gm / float(grav_constant)
 
-    print('Gravity file = {:s}'.format(gravfile))
-    print('Lmax of potential coefficients = {:d}'.format(lmaxp))
-    print('Reference radius (km) = {:f}'.format(potential.r_ref / 1.e3))
-    print('GM = {:e}\n'.format(potential.gm))
+    #print('Gravity file = {:s}'.format(gravfile))
+    #print('Lmax of potential coefficients = {:d}'.format(lmaxp))
+    #print('Reference radius (km) = {:f}'.format(potential.r_ref / 1.e3))
+    #print('GM = {:e}\n'.format(potential.gm))
 
     topo = pyshtools.SHCoeffs.from_file(topofile, lmax=lmax)
     topo.r0 = topo.coeffs[0, 0, 0]
 
-    print('Topography file = {:s}'.format(topofile))
-    print('Lmax of topography coefficients = {:d}'.format(topo.lmax))
-    print('Reference radius (km) = {:f}\n'.format(topo.r0 / 1.e3))
+    #print('Topography file = {:s}'.format(topofile))
+    #print('Lmax of topography coefficients = {:d}'.format(topo.lmax))
+    #print('Reference radius (km) = {:f}\n'.format(topo.r0 / 1.e3))
 
     density = pyshtools.SHCoeffs.from_file(densityfile, lmax=lmax)
 
-    print('Lmax of density coefficients = {:d}\n'.format(density.lmax))
+    #print('Lmax of density coefficients = {:d}\n'.format(density.lmax))
 
     lat_insight = 4.43
     lon_insight = 135.84
@@ -70,7 +70,7 @@ def calc_crust(mantlefile,    # filename for mantle profile input
 
     # --- read 1D reference interior model ---
 
-    print('=== Reading model {:s} ==='.format(mantlefile))
+    #print('=== Reading model {:s} ==='.format(mantlefile))
 
     with open(mantlefile, 'r') as f:
         lines = f.readlines()
@@ -117,10 +117,10 @@ def calc_crust(mantlefile,    # filename for mantle profile input
         mass_crust += rho[i] * vol_layer
     vol_crust = (radius[-1] - radius[crust_index]) * 1e3 * 4 * np.pi
     rho_c = mass_crust / vol_crust
-    print('Crustal density: = {:8.1f}'.format(rho_c))
+    #print('Crustal density: = {:8.1f}'.format(rho_c))
 
     r0_model = radius[nlayer-1]
-    print('Surface radius of model (km) = {:8.1f}'.format(r0_model / 1.e3))
+    #print('Surface radius of model (km) = {:8.1f}'.format(r0_model / 1.e3))
 
     # Find layer at bottom of lithosphere
     for i in range(0, nlayer):
@@ -138,16 +138,16 @@ def calc_crust(mantlefile,    # filename for mantle profile input
     n = nlayer - 1
     rho[n] = 0.  # the density above the surface is zero
     rho_mantle = rho[crust_index-1]
-    print('Mantle density (kg/m3) = {:8.1f}'.format(rho_mantle))
+    #print('Mantle density (kg/m3) = {:8.1f}'.format(rho_mantle))
 
-    print('Assumed depth of lithosphere (km) = {:6.1f}'.format(d_lith / 1.e3))
-    print('Actual depth of lithosphere in discretized model (km) = {:6.1f}'
-          .format((r0_model - radius[i_lith]) / 1.e3))
+    #print('Assumed depth of lithosphere (km) = {:6.1f}'.format(d_lith / 1.e3))
+    #print('Actual depth of lithosphere in discretized model (km) = {:6.1f}'
+    #      .format((r0_model - radius[i_lith]) / 1.e3))
 
     # initial guess of average crustal thickness
     thickave = r0_model - radius[crust_index]
-    print('Crustal thickness (km) = {:5.1f}'.format(thickave / 1e3))
-    print('Moho layer: {:d}'.format(crust_index))
+    #print('Crustal thickness (km) = {:5.1f}'.format(thickave / 1e3))
+    #print('Moho layer: {:d}'.format(crust_index))
 
     # --- Compute gravity contribution from hydrostatic density interfaces ---
 
@@ -156,15 +156,15 @@ def calc_crust(mantlefile,    # filename for mantle profile input
                                                       lmax_hydro,
                                                       finiteamplitude=False)
 
-    print('Total mass of model (kg) = {:e}'.format(mass_model))
-    print('% of J2 arising from beneath lithosphere = {:f}'
-          .format(clm_hydro.coeffs[0, 2, 0]/potential.coeffs[0, 2, 0] * 100.))
+    #print('Total mass of model (kg) = {:e}'.format(mass_model))
+    #print('% of J2 arising from beneath lithosphere = {:f}'
+    #      .format(clm_hydro.coeffs[0, 2, 0]/potential.coeffs[0, 2, 0] * 100.))
 
     potential.coeffs[:, :lmax_hydro+1, :lmax_hydro+1] -= \
         clm_hydro.coeffs[:, :lmax_hydro+1, :lmax_hydro+1]
 
     # --- Constant density model ---
-    print('-- Constant density model --\nrho_c = {:f}'.format(rho_c))
+    #print('-- Constant density model --\nrho_c = {:f}'.format(rho_c))
 
     tmin = 1.e9
     converged = False
@@ -175,17 +175,17 @@ def calc_crust(mantlefile,    # filename for mantle profile input
                               thickave, filter_type=filter, half=half,
                               lmax_calc=lmax_calc, nmax=nmax, quiet=True)
         thick = topo.pad(lmax) - moho.pad(lmax)
-        print('Average crustal thickness (km) = {:6.2f}'.format(thickave /
-                                                                1.e3))
+        #print('Average crustal thickness (km) = {:6.2f}'.format(thickave /
+        #                                                        1.e3))
         thick_insight = thick.expand(lat=lat_insight, lon=lon_insight)
-        print('Crustal thickness at InSight landing sites (km) = {:6.2f}'
-              .format(thick_insight / 1.e3))
+        #print('Crustal thickness at InSight landing sites (km) = {:6.2f}'
+        #      .format(thick_insight / 1.e3))
 
         thick_grid = thick.expand(grid='DH2')
         tmin = thick_grid.data.min()
         tmax = thick_grid.data.max()
-        print('Minimum thickness (km) = {:6.2f}'.format(tmin / 1.e3))
-        print('Maximum thickness (km) = {:6.2f}'.format(tmax / 1.e3))
+        #print('Minimum thickness (km) = {:6.2f}'.format(tmin / 1.e3))
+        #print('Maximum thickness (km) = {:6.2f}'.format(tmax / 1.e3))
 
         if tmin - t0 < - t0_sigma:
             thickave += t0 - tmin
@@ -253,7 +253,7 @@ def calc_crust(mantlefile,    # filename for mantle profile input
 
     with h5py.File(fnam_out_model, 'w') as f:
         f.create_dataset('model_name', data=mantlefile)
-        print('Writing to %s' % fnam_out_model)
+        #print('Writing to %s' % fnam_out_model)
         grp_crust = f.create_group('crust')
         grp_crust.create_dataset('moho', data=moho_grid.data)
         grp_crust.create_dataset('topo', data=topo_grid.data)

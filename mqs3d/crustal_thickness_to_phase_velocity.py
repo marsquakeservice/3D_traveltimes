@@ -9,6 +9,8 @@ A class to compute surface wave velocity maps from crustal thickness.
 :license:
     None
 """
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import math
 import numpy as np
@@ -308,7 +310,6 @@ class CrustalThicknessToVelocity(object):
 
         figs = []
         for v in velo:
-            print(v, period)
             fig = plt.figure()
             ax = plt.gca()
             vmap = velo_map[v](period, thickness)
@@ -332,8 +333,6 @@ class CrustalThicknessToVelocity(object):
                 vmean2, std = weighted_avg_and_std(vmap, np.sin(theta))
 
                 vmean_reldiff = (vmean - vmean2) / (vmean + vmean2) * 2 * 100
-
-                print(vmean, vmean2, std / vmean2 * 100, vmean_reldiff)
 
                 vmap = (vmap - vmean) / vmean * 100
                 vmax = np.max(np.abs(vmap))
@@ -459,6 +458,7 @@ class CrustalThicknessToVelocity(object):
                 vmean[i], vstd[i] = weighted_avg_and_std(vmap, np.sin(theta))
                 vhmean[i] = 1. / weighted_avg_and_std(1. / vmap, np.sin(theta))[0]
 
+            '''
             from scipy import interpolate
             p = self.logspaced_periods(5)
 
@@ -474,7 +474,7 @@ class CrustalThicknessToVelocity(object):
             f = interpolate.interp1d(periods, vhmean)
             for _p in p:
                 print(_p, f(_p))
-
+            '''
             figs.append(plt.figure())
             plt.plot(periods, vhmean, 'k', label='1/<1/v(ct)>')
             plt.plot(periods, vmean, 'b', label='<v(ct)>')
