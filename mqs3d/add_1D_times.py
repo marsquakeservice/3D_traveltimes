@@ -126,7 +126,7 @@ def add_bodywave_times(hdf5_file, npz_file):
                 arrs = model.get_travel_times(source_depth_in_km=depth_i,
                                               distance_in_degree=dist_i,
                                               phase_list=phase_names[:-2])
-            except RuntimeError:
+            except:
                 # print('Error at depth %5.1f, distance %5.1f' % (depth_i, dist_i))
                 pass
             else:
