@@ -20,24 +20,24 @@ import warnings
 from h5py import File
 
 
-def shoot(latitude_1_degree, longitude_1_degree, bearing_degree, distance, radius):
+def shoot(latitude_1_degree, longitude_1_degree, bearing_degree, distance_km, radius_km):
     """
     Shoot a ray from point in direction for certain length and return where you land
     (Direct geodetic problem). Works on sphere
     :param latitude_1_degree: latitude of starting point
     :param longitude_1_degree: longitude of starting point
     :param bearing_degree: bearing from north, CW
-    :param distance: distance in kilometer
-    :param radius: radius of planet
+    :param distance_km: distance in kilometer
+    :param radius_km: radius of planet
     :return: latitude, longitude of target
     """
     lat1 = np.deg2rad(latitude_1_degree)
     lon1 = np.deg2rad(longitude_1_degree)
     bearing = np.deg2rad(bearing_degree)
-    lat2 = np.arcsin(np.sin(lat1) * np.cos(distance / radius) +
-                     np.cos(lat1) * np.sin(distance / radius) * np.cos(bearing))
-    lon2 = lon1 + np.arctan2(np.sin(bearing) * np.sin(distance / radius) * np.cos(lat1),
-                             np.cos(distance / radius) - np.sin(lat1) * np.sin(lat2))
+    lat2 = np.arcsin(np.sin(lat1) * np.cos(distance_km / radius_km) +
+                     np.cos(lat1) * np.sin(distance_km / radius_km) * np.cos(bearing))
+    lon2 = lon1 + np.arctan2(np.sin(bearing) * np.sin(distance_km / radius_km) * np.cos(lat1),
+                             np.cos(distance_km / radius_km) - np.sin(lat1) * np.sin(lat2))
     return np.rad2deg(lat2), np.mod(np.rad2deg(lon2) + 540., 360.) - 180.
 
 
@@ -389,7 +389,7 @@ class SurfaceWaveRayTracer(object):
 
     def calc_tt_map(self, nstep_dist, nstep_baz):
         rec_longitude, rec_latitude = 136., 5.
-        dists = np.linspace(0.01, 0.99, nstep_dist) * np.pi * self.R
+        dists = np.linspace(0.01, 0.99, nstep_dist, endpoint=True) * np.pi * self.R
         bazs = np.linspace(-360 / (nstep_baz),
                            360 * (nstep_baz + 1) / (nstep_baz),
                            nstep_baz, endpoint=True)
@@ -398,7 +398,7 @@ class SurfaceWaveRayTracer(object):
             for ibaz, baz in enumerate(bazs):
                 src_latitude, src_longitude = shoot(rec_latitude, rec_longitude,
                                                     bearing_degree=baz,
-                                                    distance=dist, radius=self.R)
+                                                    distance_km=dist, radius_km=self.R)
                 self.set_source_receiver(src_longitude, src_latitude,
                                          rec_longitude, rec_latitude)
                 tt[idist, ibaz] = self.compute_travel_time_great_circle(1, which='group')
