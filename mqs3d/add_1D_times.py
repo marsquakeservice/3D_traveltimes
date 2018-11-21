@@ -161,9 +161,9 @@ def add_bodywave_times(hdf5_file, npz_file):
         grp_body_waves.create_dataset('distances', data=dists)
         grp_body_waves.create_dataset('depths', data=depths)
         grp_body_waves.create_dataset('phase_names', data=[n.encode("ascii", "ignore") for n in phase_names])
-        grp_body_waves.create_dataset('times', data=times, dtype='f2', compression=1)
-        grp_body_waves.create_dataset('inc_angles', data=inc_angles, dtype='f2', compression=1)
-        grp_body_waves.create_dataset('slowness', data=slownesses, dtype='f2', compression=1)
+        grp_body_waves.create_dataset('times', data=times, dtype='f2')
+        grp_body_waves.create_dataset('inc_angles', data=inc_angles, dtype='f2')
+        grp_body_waves.create_dataset('slowness', data=slownesses, dtype='f2')
 
 
 if __name__ == '__main__':
