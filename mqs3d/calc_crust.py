@@ -81,6 +81,7 @@ def calc_crust(mantlefile,    # filename for mantle profile input
         lines = f.readlines()
     lines_full = lines.copy()
     if modeltype == 'AK':
+        lines = lines[4:]
         lines = lines[::-1]
     elif modeltype == 'TR':
         lines = lines[4:]
