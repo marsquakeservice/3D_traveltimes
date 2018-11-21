@@ -1,7 +1,7 @@
 import numpy as np
 from obspy.taup import TauPyModel
 import h5py
-from tqdm import tqdm
+# from tqdm import tqdm
 import os
 
 
@@ -132,14 +132,13 @@ def add_bodywave_times(hdf5_file, npz_file):
     times = np.ones((len(depths), len(dists), len(phase_names))) * -1
     inc_angles = np.zeros_like(times)
     slownesses = np.zeros_like(inc_angles)
-    for x, depth_i in enumerate(tqdm(depths)):
+    for x, depth_i in enumerate(depths):
         for y, dist_i in enumerate(dists):
             try:
                 arrs = model.get_travel_times(source_depth_in_km=depth_i,
                                               distance_in_degree=dist_i,
                                               phase_list=phase_names[:-2])
             except:
-                # print('Error at depth %5.1f, distance %5.1f' % (depth_i, dist_i))
                 pass
             else:
                 for arr in np.flip(arrs, 0):
