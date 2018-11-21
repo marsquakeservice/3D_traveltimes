@@ -89,7 +89,7 @@ def add_bodywave_times(hdf5_file, npz_file):
              80.00, 81.00, 82.00, 83.00, 84.00, 85.00, 86.00, 87.00, 88.00, 89.00,
              90.00, 91.00, 92.00, 93.00, 94.00, 95.00, 96.00, 97.00, 98.00, 99.00,
              100.00, 105.00, 110.00, 115.00, 120.00, 125.00, 130.00, 135.00, 140.00, 145.00,
-             150.00, 155.00, 160.00, 165.00, 170.00, 175.00, 179.00]
+             150.00, 155.00, 160.00, 165.00, 170.00, 175.00, 179.50]
     '''
     dists = [0.00, 0.10, 0.20, 0.30, 0.40, 0.50, 0.60, 0.70, 0.80, 0.90,
              1.00, 1.10, 1.20, 1.30, 1.40, 1.50, 1.60, 1.70, 1.80, 1.90,
@@ -114,13 +114,10 @@ def add_bodywave_times(hdf5_file, npz_file):
              150.00, 155.00, 160.00, 165.00, 170.00, 175.00, 179.00]
     '''
 
-    phase_names = ['p', 's', 'pP', 'sP', 'pS', 'sS', 'P', 'S', 'PP', 'SS', 'PPP', 'SSS', 'Pn', 'Sn', 'Pg', 'Sg', 'PcP',
+    phase_names = ['p', 's', 'pP', 'sP', 'pS', 'sS', 'P', 'S', 'PP', 'SS', 'PPP', 'SSS', 'SP', 'PS',
+                   'Pn', 'Sn', 'Pg', 'Sg', 'PcP', 'ScSScS', 'PmP', 'SmS', 'Pvmp', 'Svms',
                    'ScS', 'PKKP', 'SKKS', 'Pdiff', 'Sdiff', 'PKP', 'SKS', 'P1', 'S1']
-    '''
-    phase_names = ['p', 's', 'pP', 'sP', 'pS', 'sS', 'P', 'S', 'PP', 'SS', 'PPP', 'SSS', 'Pn', 'Sn', 'Pg', 'Sg', 'PcP',
-                   'ScS', 'PmP', 'SmS', 'SmP', 'PmS', 'P^mP', 'S^mS', 'S^mP', 'P^mS', 'PvmP', 'SvmS', 'SvmP', 'PvmS',
-                   'PKKP', 'SKKS', 'SKKP', 'PKKS', 'Pdiff', 'Sdiff', 'PKP', 'SKS', 'PKiKP', 'SKiKS', 'PKIKP', 'SKIKS']
-    '''
+
 
     n_phase = {}
     for counter, phase in enumerate(phase_names):
@@ -132,6 +129,8 @@ def add_bodywave_times(hdf5_file, npz_file):
     times = np.ones((len(depths), len(dists), len(phase_names))) * -1
     inc_angles = np.zeros_like(times)
     slownesses = np.zeros_like(inc_angles)
+    mod = model.model
+    vp_crust = mod.s_mod.v_mod.evaluate_above(mod.moho_depth/2., 'p')
     for x, depth_i in enumerate(tqdm(depths)):
         for y, dist_i in enumerate(dists):
             try:
@@ -139,9 +138,11 @@ def add_bodywave_times(hdf5_file, npz_file):
                                               distance_in_degree=dist_i,
                                               phase_list=phase_names[:-2])
             except:
-                # print('Error at depth %5.1f, distance %5.1f' % (depth_i, dist_i))
                 pass
             else:
+                # Fill Pg travel time with phase of group velocity of mid crust
+                times[x, y, n_phase['Pg']] = np.deg2rad(dist_i) * \
+                                             mod.radius_of_planet / vp_crust
                 for arr in np.flip(arrs, 0):
                     times[x, y, n_phase[arr.phase.name]] = arr.time
                     inc_angles[x, y, n_phase[arr.phase.name]] = arr.incident_angle
