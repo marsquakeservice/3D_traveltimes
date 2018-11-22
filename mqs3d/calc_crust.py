@@ -130,9 +130,8 @@ def calc_crust(mantlefile,    # filename for mantle profile input
         nlayer += 1
 
     # find core
-    cmb_index = _find_core(vs)
-
     vs[vs < 1] = 0  # added (for vs to be = 0 in the core), 04.09.2018
+    cmb_index = _find_core(vs)
 
     # Calculate crustal density
     mass_crust = 0
