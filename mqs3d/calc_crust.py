@@ -117,17 +117,9 @@ def calc_crust(mantlefile,    # filename for mantle profile input
         crust_index = nlayer - 6  # True for all Khan models
 
     elif modeltype == 'SH':
-        bedrock_index = nlayer - 1
-        conrad_index = nlayer - 3
-        radius = np.append(radius, radius[nlayer-1])
-        radius[-2] -= 1e3
-        vp = np.append(vp, vp[-1] * 0.6)
-        vs = np.append(vs, vs[-1] * 0.5)
-        rho = np.append(rho, rho[-1] * 0.8)
-        qmu = np.append(qmu, qmu[-1])
-        qka = np.append(qka, qka[-1])
         crust_index = int(lines_full[2].split()[3]) - 2
-        nlayer += 1
+        bedrock_index = nlayer - 2
+        conrad_index = nlayer - 6
 
     # find core
     vs[vs < 1] = 0  # added (for vs to be = 0 in the core), 04.09.2018
