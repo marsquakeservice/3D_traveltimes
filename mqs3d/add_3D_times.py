@@ -57,7 +57,7 @@ def plot_tts(swrt, **kwargs):
 
 
 def calc_disp_map(model_file, periods, work_dir):
-    work_dir_local = '/tmp' #os.path.join(work_dir, model_name)
+    work_dir_local = '/scratch/snx3000/staehler' #os.path.join(work_dir, model_name)
     plot_dir = 'plots' #os.path.join(work_dir, model_name)
     topo, moho, lat, lon = read_crustal_thickness_h5(model_file)
     thickness = filter_model_shtns(topo - moho, lmax=8, order=6)
@@ -75,7 +75,7 @@ def calc_disp_map(model_file, periods, work_dir):
                                             fmin=1./max(periods), fmax=1./min(periods), intk=2,
                                             with_topo=True, path_out=work_dir_local)
 
-        plot_dispersion(ctvelo, plot_dir, thickness, periods, type)
+        # plot_dispersion(ctvelo, plot_dir, thickness, periods, type)
         for iperiod, p in enumerate(periods):
             v = ctvelo.group_velocity(p, thickness)
             v = filter_model_shtns(v, lmax=8)
