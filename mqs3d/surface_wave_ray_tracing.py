@@ -53,7 +53,7 @@ def weighted_avg_and_std(values, weights):
 
 
 class SurfaceWaveRayTracer(object):
-    def __init__(self, R, lmax, nphi=None, ntheta=None, delta_phi=1.):
+    def __init__(self, R, lmax, nphi=None, ntheta=None, delta_phi=1., verbose=False):
         self.R = R
         self.lmax = lmax
 
@@ -387,8 +387,8 @@ class SurfaceWaveRayTracer(object):
         else:
             raise ValueError()
 
-    def calc_tt_map(self, nstep_dist, nstep_baz):
-        rec_longitude, rec_latitude = 136., 5.
+    def calc_tt_map(self, nstep_dist, nstep_baz, rec_longitude = 136., rec_latitude = 5.):
+
         dists = np.linspace(0.01, 0.99, nstep_dist, endpoint=True) * np.pi * self.R
         bazs = np.linspace(-360 / (nstep_baz),
                            360 * (nstep_baz + 1) / (nstep_baz),
@@ -402,6 +402,11 @@ class SurfaceWaveRayTracer(object):
                 self.set_source_receiver(src_longitude, src_latitude,
                                          rec_longitude, rec_latitude)
                 tt[idist, ibaz] = self.compute_travel_time_great_circle(1, which='group')
+
+                # fig = self.plot_velocity(show=False)
+                # fig.savefig(fname='map_rotated_%d_%d.png' % (idist, ibaz))
+                # fig = self.plot_velocity(show=False, rotated=False)
+                # fig.savefig(fname='map_nonrot_%d_%d.png' % (idist, ibaz))
         return bazs, dists, tt
 
     def plot_velocity(self, show=True, rotated=True, source=True,

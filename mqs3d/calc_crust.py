@@ -35,7 +35,8 @@ def calc_crust(mantlefile,    # filename for mantle profile input
                fnam_out_plot=None,      # Output file name for plot of map
                t0=1.e3,       # minimum crustal thickness
                d_lith=300.e3,  # Lithosphere thickness
-               modeltype='AK' # 'AK', 'TR', 'SH', 'TG', 'SK'
+               modeltype='AK', # 'AK', 'TR', 'SH', 'TG', 'SK'
+               verbose=False
                ):
 
     lmax_calc = 90
@@ -83,6 +84,9 @@ def calc_crust(mantlefile,    # filename for mantle profile input
     if modeltype == 'AK':
         lines = lines[4:]
         lines = lines[::-1]
+    elif modeltype == 'FN':
+        lines = lines[4:]
+        lines = lines[::-1]
     elif modeltype == 'TR':
         lines = lines[4:]
     elif modeltype == 'SH':
@@ -115,6 +119,11 @@ def calc_crust(mantlefile,    # filename for mantle profile input
         bedrock_index = nlayer - 2  # True for all Khan models
         conrad_index = nlayer - 4  # True for all Khan models
         crust_index = nlayer - 6  # True for all Khan models
+
+    elif modeltype == 'FN':
+        bedrock_index = nlayer - 2
+        conrad_index = nlayer - 4  # Not really a discontinuity in his files
+        crust_index = nlayer - 6
 
     elif modeltype == 'SH':
         crust_index = int(lines_full[2].split()[3]) - 2
@@ -209,12 +218,16 @@ def calc_crust(mantlefile,    # filename for mantle profile input
 
 
     # Write Model to disk
-    lats = np.arange(-87.5, 90., 5.)
-    lons = np.arange(0, 360, 5)
+    lmax_filter = 36 #72 # Twice the order of the written SHs
+    # lats = np.arange(-87.5, 90., 5.)
+    # lons = np.arange(0, 360, 5)
+    offset = 90. / np.float(lmax_filter)
+    lats = - np.linspace(-90 + offset, 90 - offset, num=lmax_filter)
+    lons = np.linspace(0, 360, num=lmax_filter * 2, endpoint=False)
 
 
     # Apply tapered anti-aliasing filter to SH before transformation
-    lmax_filter = 36
+
     order = 2
     lvals = np.zeros_like(topo.coeffs)
     for i in range(0, lvals.shape[1]):

@@ -38,10 +38,11 @@ class CrustalThicknessToVelocity(object):
 
     def __init__(self, master_model_file, path_out='.',
                  nthick=10, mtype='rayleigh', overtone_number=0, fmin=0.005,
-                 fmax=0.1, nfreq=100, intk=3, with_topo=False):
+                 fmax=0.1, nfreq=100, intk=3, with_topo=False, verbose=False):
 
         with File(master_model_file, 'r') as h5file:
-            self.min_thickness = max(np.asarray(h5file['status']['thickness_minimum']), 10100.)
+            #self.min_thickness = max(np.asarray(h5file['status']['thickness_minimum']), 10100.)
+            self.min_thickness = np.asarray(h5file['status']['thickness_minimum'])
             # print('Minimum thickness: %5.1f m' % self.min_thickness)
             self.max_thickness = np.asarray(h5file['status']['thickness_maximum'])
             # print('Maximum thickness: %5.1f m' % self.max_thickness)
@@ -62,7 +63,7 @@ class CrustalThicknessToVelocity(object):
                                                                thicknesses=ts,
                                                                path_out=path_out)
 
-        for i, t in enumerate(tqdm(ts)):
+        for i, t in enumerate(tqdm(ts, disable=not(verbose))):
             sw = specnm.SurfaceWaveDispersion(
                 model[i], mtype=mtype, min_overtone_number=overtone_number, l0=25,
                 shortest_period=1. / fmax)
@@ -137,6 +138,7 @@ class CrustalThicknessToVelocity(object):
         # radius_conrad = radius[-5]
         radius_planet = radius[-1]
         radius_bedrock = radius[mantle['bedrock_layer']]
+        radius_moho = radius[mantle['moho_layer']]
         if int(mantle['conrad_layer'].value) > 1:
             radius_conrad = radius[mantle['conrad_layer']]
         else:
@@ -162,10 +164,13 @@ class CrustalThicknessToVelocity(object):
         os.makedirs(os.path.join(path_out, 'modified_models'), exist_ok=True)
 
         for crustal_thickness in thicknesses:
-            radius_moho = radius_planet - crustal_thickness
+            radius_moho_corr = radius_planet - crustal_thickness
+            corrfac = crustal_thickness / (radius_planet - radius_moho)
+            radius_conrad_corr = radius_planet - (radius_planet - radius_conrad) * corrfac
+            radius_bedrock_corr = radius_planet - (radius_planet - radius_bedrock) * corrfac
             # Need to find layer, where new Moho is and omit everything
             # above that
-            upper['mantle_new'] = min(upper['mantle'], - (nlayer - np.argmax(radius > radius_moho)))
+            upper['mantle_new'] = min(upper['mantle'], - (nlayer - np.argmax(radius > radius_moho_corr)))
             fnam = os.path.join(path_out,
                                 'modified_models',
                                 os.path.splitext(fnam_model)[0] +
@@ -191,20 +196,30 @@ class CrustalThicknessToVelocity(object):
                              vs[i]))
 
                 # Write line below Moho
+                # f.write(line_fmt %
+                #         (radius_moho_corr,
+                #          ipl_mantle['rho'](radius_moho_corr),
+                #          ipl_mantle['vp'](radius_moho_corr),
+                #          ipl_mantle['vs'](radius_moho_corr),
+                #          ipl_mantle['qka'](radius_moho_corr),
+                #          ipl_mantle['qmu'](radius_moho_corr),
+                #          ipl_mantle['vp'](radius_moho_corr),
+                #          ipl_mantle['vs'](radius_moho_corr))
+                #         )
                 f.write(line_fmt %
-                        (radius_moho,
-                         ipl_mantle['rho'](radius_moho),
-                         ipl_mantle['vp'](radius_moho),
-                         ipl_mantle['vs'](radius_moho),
-                         ipl_mantle['qka'](radius_moho),
-                         ipl_mantle['qmu'](radius_moho),
-                         ipl_mantle['vp'](radius_moho),
-                         ipl_mantle['vs'](radius_moho))
+                        (radius_moho_corr,
+                         mantle['rho'][upper['mantle']],
+                         mantle['vp'][upper['mantle']],
+                         mantle['vs'][upper['mantle']],
+                         mantle['qka'][upper['mantle']],
+                         mantle['qmu'][upper['mantle']],
+                         mantle['vp'][upper['mantle']],
+                         mantle['vs'][upper['mantle']])
                         )
 
                 # Write line above Moho
                 f.write(line_fmt %
-                        (radius_moho,
+                        (radius_moho_corr,
                          crust_rho['lc'],
                          crust_vp['lc'],
                          crust_vs['lc'],
@@ -213,10 +228,11 @@ class CrustalThicknessToVelocity(object):
                          crust_vp['lc'],
                          crust_vs['lc']))
 
-                if radius_moho < radius_conrad:
+                if radius_moho_corr < radius_conrad:
                     # Write line below Conrad
                     f.write(line_fmt %
-                            (radius_conrad,
+                            #(radius_conrad,
+                            (radius_conrad_corr,
                              crust_rho['lc'],
                              crust_vp['lc'],
                              crust_vs['lc'],
@@ -226,7 +242,8 @@ class CrustalThicknessToVelocity(object):
                              crust_vs['lc']))
                     # Write line above Conrad
                     f.write(line_fmt %
-                            (radius_conrad,
+                            #(radius_conrad,
+                            (radius_conrad_corr,
                              crust_rho['uc'],
                              crust_vp['uc'],
                              crust_vs['uc'],
@@ -237,7 +254,7 @@ class CrustalThicknessToVelocity(object):
 
                 # Write line below bedrock
                 f.write(line_fmt %
-                        (radius_bedrock,
+                        (radius_bedrock_corr,
                          crust_rho['uc'],
                          crust_vp['uc'],
                          crust_vs['uc'],
@@ -247,7 +264,7 @@ class CrustalThicknessToVelocity(object):
                          crust_vs['uc']))
                 # Write line above bedrock
                 f.write(line_fmt %
-                        (radius_bedrock,
+                        (radius_bedrock_corr,
                          crust_rho['bedrock'],
                          crust_vp['bedrock'],
                          crust_vs['bedrock'],
