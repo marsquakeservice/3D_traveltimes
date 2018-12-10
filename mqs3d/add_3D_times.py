@@ -1,5 +1,3 @@
-import matplotlib
-matplotlib.use('Agg')
 from mqs3d.crustal_thickness_to_phase_velocity import CrustalThicknessToVelocity, \
     filter_model_shtns, read_crustal_thickness_h5, write_model_h5
 
@@ -56,16 +54,18 @@ def plot_tts(swrt, **kwargs):
     plt.ylabel(s='$\Delta$T / seconds')
 
 
-def calc_disp_map(model_file, periods, work_dir):
+def calc_disp_map(model_file, periods, plot=False):
     work_dir_local = '/tmp' #os.path.join(work_dir, model_name)
     plot_dir = 'plots' #os.path.join(work_dir, model_name)
     topo, moho, lat, lon = read_crustal_thickness_h5(model_file)
-    thickness = filter_model_shtns(topo - moho, lmax=8, order=6)
-    topo = filter_model_shtns(topo, lmax=8, order=6)
-    write_model_h5(topo, lmax=16,
+    lmax_in = int(len(lat) / 4) - 1
+    thickness = filter_model_shtns(topo - moho, lmax=lmax_in, order=6)
+    topo = filter_model_shtns(topo, lmax=lmax_in, order=6)
+    lmax_out = lmax_in * 2
+    write_model_h5(topo, lmax=lmax_out,
                    fname=model_file,
                    varpath='ylm_maps/surface_radius')
-    write_model_h5(moho, lmax=16,
+    write_model_h5(moho, lmax=lmax_out,
                    fname=model_file,
                    varpath='ylm_maps/moho_radius')
 
@@ -75,17 +75,18 @@ def calc_disp_map(model_file, periods, work_dir):
                                             fmin=1./max(periods), fmax=1./min(periods), intk=2,
                                             with_topo=True, path_out=work_dir_local)
 
-        plot_dispersion(ctvelo, plot_dir, thickness, periods, type)
+        if plot:
+            plot_dispersion(ctvelo, plot_dir, thickness, periods, type)
         for iperiod, p in enumerate(periods):
             v = ctvelo.group_velocity(p, thickness)
-            v = filter_model_shtns(v, lmax=8)
-            write_model_h5(v, lmax=16,
+            v = filter_model_shtns(v, lmax=lmax_in)
+            write_model_h5(v, lmax=lmax_out,
                            fname=model_file,
                            varpath='ylm_maps/tt_%s_group_%02d' % (type, iperiod))
 
             v = ctvelo.phase_velocity(p, thickness)
-            v = filter_model_shtns(v, lmax=8)
-            write_model_h5(v, lmax=16,
+            v = filter_model_shtns(v, lmax=lmax_in)
+            write_model_h5(v, lmax=lmax_out,
                            fname=model_file,
                            varpath='ylm_maps/tt_%s_phase_%02d' % (type, iperiod))
     return
@@ -146,12 +147,12 @@ def write_tt_to_file(fname, periods, bazs, dists, tts):
                                           dtype='f2')
 
 
-def add_3D_traveltimes(model_file):
+def add_3D_traveltimes(model_file, verbose=False, plot=False):
     model_name = os.path.splitext(os.path.split(model_file)[-1])[0]
     work_dir = os.path.join('models_out')
-    calc_disp_map(model_file, periods, work_dir)
+    calc_disp_map(model_file, periods, plot=plot)
 
-    swrt = SurfaceWaveRayTracer(R_mars, 32, nphi=90, ntheta=48)
+    swrt = SurfaceWaveRayTracer(R_mars, lmax=32, nphi=90, ntheta=48, verbose=verbose)
     tts = {'rayleigh': [],
            'love': []}
     cmap = {'rayleigh': plt.get_cmap('plasma'),
@@ -160,23 +161,28 @@ def add_3D_traveltimes(model_file):
     for type in ['rayleigh', 'love']:
         for iperiod in range(0, len(periods)):
             swrt.load_velocity_model_h5(fname=model_file, type=type, iperiod=iperiod)
-            plot_tts(swrt, label='%s, %3d sec' % (type, periods[iperiod]),
-                     color=cmap[type](float(iperiod) / len(periods)), ls='solid')
+            if plot:
+                plot_tts(swrt, label='%s, %3d sec' % (type, periods[iperiod]),
+                         color=cmap[type](float(iperiod) / len(periods)), ls='solid')
 
             swrt.apply_ellipticity_correction()
-            plot_tts(swrt, label='%s, elli %3d sec' % (type, periods[iperiod]),
-                     color=cmap[type](float(iperiod) / len(periods)), ls='dotted')
+            if plot:
+                plot_tts(swrt, label='%s, elli %3d sec' % (type, periods[iperiod]),
+                         color=cmap[type](float(iperiod) / len(periods)), ls='dotted')
 
             swrt.apply_topography_correction()
-            plot_tts(swrt, label='%s, topo %3d sec' % (type, periods[iperiod]),
-                     color=cmap[type](float(iperiod) / len(periods)), ls='dashed')
+            if plot:
+                plot_tts(swrt, label='%s, topo %3d sec' % (type, periods[iperiod]),
+                         color=cmap[type](float(iperiod) / len(periods)), ls='dashed')
 
             bazs, dists, tt = swrt.calc_tt_map(nstep_baz=32, nstep_dist=24)
             tts[type].append(tt)
-        plt.title('Corrections, %s' % type)
-        plt.grid(axis='both')
-        plt.legend()
-        plt.savefig('plots/TTcorr_90deg_%s_%s.pdf' % (model_name, type))
+
+        if plot:
+            plt.title('Corrections, %s' % type)
+            plt.grid(axis='both')
+            plt.legend()
+            plt.savefig('plots/TTcorr_90deg_%s_%s.pdf' % (model_name, type))
         plt.close('all')
     write_tt_to_file(model_file, periods, bazs, dists, tts)
 

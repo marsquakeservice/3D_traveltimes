@@ -1,7 +1,7 @@
 import numpy as np
 from obspy.taup import TauPyModel
 import h5py
-# from tqdm import tqdm
+from tqdm import tqdm
 import os
 
 
@@ -50,7 +50,7 @@ def create_taup(model_file, taup_path ='taup_files'):
         return taup_name
 
 
-def add_bodywave_times(hdf5_file, npz_file):
+def add_bodywave_times(hdf5_file, npz_file, verbose=False):
 
     model = TauPyModel(npz_file)
 
@@ -131,7 +131,7 @@ def add_bodywave_times(hdf5_file, npz_file):
     slownesses = np.zeros_like(inc_angles)
     mod = model.model
     vp_crust = mod.s_mod.v_mod.evaluate_above(mod.moho_depth/2., 'p')
-    for x, depth_i in enumerate(depths):
+    for x, depth_i in enumerate(tqdm(depths, disable=not(verbose))):
         for y, dist_i in enumerate(dists):
             try:
                 arrs = model.get_travel_times(source_depth_in_km=depth_i,
