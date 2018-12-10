@@ -76,12 +76,8 @@ def calc_disp_map(model_file, periods, plot=False):
                                             fmin=1./max(periods), fmax=1./min(periods), intk=2,
                                             with_topo=True, path_out=work_dir_local)
 
-<<<<<<< HEAD
-        # plot_dispersion(ctvelo, plot_dir, thickness, periods, type)
-=======
         if plot:
             plot_dispersion(ctvelo, plot_dir, thickness, periods, type)
->>>>>>> dc58696f56ce68540216020e215e89699531b8b3
         for iperiod, p in enumerate(periods):
             v = ctvelo.group_velocity(p, thickness)
             v = filter_model_shtns(v, lmax=lmax_in)
