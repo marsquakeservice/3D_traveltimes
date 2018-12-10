@@ -23,7 +23,7 @@ import h5py
 
 def _find_core(vs):
     for ilayer in range(len(vs)-2, 1, -1):
-        if vs[ilayer+1] > 1e-5 and vs[ilayer] < 1e-5:
+        if vs[ilayer+1] > 2 and vs[ilayer] < 2:
             break
     return ilayer
 
