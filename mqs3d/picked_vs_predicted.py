@@ -125,7 +125,7 @@ with File(hdf5_file, 'r') as f:
         ax[4].set_xlabel('seconds')
         ax[4].legend()
         plt.tight_layout()
-        fig.savefig('%s_correction_%05.1fs.png' % (type, periods[iperiod]))
+        fig.savefig('%s_correction_%05.1fs.png' % (type, periods[iperiod]), dpi=300)
         plt.show()
 
         # plt.hist(dT_1D.flatten(), bins=np.arange(-212.5, 220, 25))

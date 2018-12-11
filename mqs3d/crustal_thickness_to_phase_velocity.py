@@ -167,7 +167,7 @@ class CrustalThicknessToVelocity(object):
             radius_moho_corr = radius_planet - crustal_thickness
             corrfac = crustal_thickness / (radius_planet - radius_moho)
             radius_conrad_corr = radius_planet - (radius_planet - radius_conrad) * corrfac
-            radius_bedrock_corr = radius_planet - (radius_planet - radius_bedrock) * corrfac
+            radius_bedrock_corr = radius_planet - (radius_planet - radius_bedrock) * min(corrfac, 2.0)
             # Need to find layer, where new Moho is and omit everything
             # above that
             upper['mantle_new'] = min(upper['mantle'], - (nlayer - np.argmax(radius > radius_moho_corr)))
